@@ -19,15 +19,15 @@
 
 ;; single letter matching groups (Chapter 1)
 (defconst scala-syntax:hexDigit-group "0-9A-Fa-f")
-(defconst scala-syntax:UnicodeEscape-re (concat "\\\\u[" scala-syntax:hexDigit-group "]\\{4\\}"))
+(defconst scala-syntax:UnicodeEscape-re (concat "\\\\u+[" scala-syntax:hexDigit-group "]\\{4\\}"))
 
 (defconst scala-syntax:upper-group "[:upper:]\\$") ;; missing _ to make ids work
 (defconst scala-syntax:upperAndUnderscore-group (concat "_" scala-syntax:upper-group ))
-(defconst scala-syntax:lower-group "[:lower:]")
+(defconst scala-syntax:lower-group "[:lower:]_")
 (defconst scala-syntax:letter-group (concat scala-syntax:lower-group scala-syntax:upper-group)) ;; TODO: add Lt, Lo, Nl
 (defconst scala-syntax:digit-group "0-9")
 (defconst scala-syntax:letterOrDigit-group (concat
-                                            scala-syntax:upperAndUnderscore-group
+                                            scala-syntax:upper-group
                                             scala-syntax:lower-group
                                             scala-syntax:digit-group))
 (defconst scala-syntax:opchar-safe-group "!%&*+/?\\\\^|~-") ;; TODO: Sm, So
@@ -35,8 +35,9 @@
 (defconst scala-syntax:opchar-group (concat scala-syntax:opchar-unsafe-group
                                             scala-syntax:opchar-safe-group))
 
-;; Scala delimiters (Chapter 1), but no quotes
-(defconst scala-syntax:delimiter-group ".,;")
+;; Scala delimiters (Chapter 1)
+(defconst scala-syntax:delimiter-group "`'\".,;")
+(defconst scala-syntax:paren-group "()[]{}")
 
 ;; Integer Literal (Chapter 1.3.1)
 (defconst scala-syntax:nonZeroDigit-group "1-9")
@@ -122,19 +123,29 @@
 (defconst scala-syntax:idrest-re
   ;; Eagerness of regexp causes problems with _. The following is a workaround,
   ;; but the resulting regexp matches only what SLS demands.
-  (concat "\\(" "[_]??" "[" scala-syntax:letter-group scala-syntax:digit-group "]+" "\\)*"
-          "\\(" "_+" scala-syntax:op-re "\\|" "_" "\\)?"))
+  (concat "\\(" "[" scala-syntax:letter-group scala-syntax:digit-group "]*" "\\)"
+          "\\(" "_" scala-syntax:op-re "\\)?"))
+
 (defconst scala-syntax:varid-re (concat "[" scala-syntax:lower-group "]" scala-syntax:idrest-re))
 (defconst scala-syntax:capitalid-re (concat "[" scala-syntax:upperAndUnderscore-group "]" scala-syntax:idrest-re))
 ;; alphaid introduce by SIP11
 (defconst scala-syntax:alphaid-re (concat "\\(" "[" scala-syntax:lower-group scala-syntax:upperAndUnderscore-group "]" scala-syntax:idrest-re "\\)"))
-(defconst scala-syntax:plainid-re (concat "\\(" scala-syntax:alphaid-re "\\|" scala-syntax:op-re "\\)"))
+(defconst scala-syntax:boundvarid-re (concat "\\(" scala-syntax:varid-re "\\|" "`" scala-syntax:varid-re "`" "\\)"))
+(defconst scala-syntax:plainid-re (concat "\\(" "[" scala-syntax:upper-group "]" scala-syntax:idrest-re "\\|" scala-syntax:varid-re "\\|" scala-syntax:op-re "\\)"))
 ;; stringlit is referred to, but not defined Scala Language Specification 2.9
 ;; we define it as consisting of anything but '`' and newline
 (defconst scala-syntax:stringlit-re "[^`\n\r]")
 (defconst scala-syntax:quotedid-re (concat "`" scala-syntax:stringlit-re "+`"))
-(defconst scala-syntax:id-re (concat "\\(" scala-syntax:plainid-re
-                              "\\|" scala-syntax:quotedid-re "\\)"))
+(defconst scala-syntax:charNoBackQuoteOrNewline-re "^[^\n`]*")
+(defconst scala-syntax:id-re (concat "\\("
+                              scala-syntax:plainid-re
+                              "\\|" "`" "\\("
+                                          scala-syntax:charNoBackQuoteOrNewline-re
+                                    "\\|" scala-syntax:UnicodeEscape-re
+                                    "\\|" scala-syntax:escapeSequence-re
+                                    "\\)*" "`"
+                              "\\)" ))
+
 (defconst scala-syntax:id-first-char-group
   (concat scala-syntax:lower-group
           scala-syntax:upperAndUnderscore-group
